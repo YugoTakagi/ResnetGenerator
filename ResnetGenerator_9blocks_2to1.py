@@ -5,18 +5,14 @@ from torchsummary import summary
 import numpy as np
 
 
-# AdaptedToPatchNCE
+# @TODO AdaptedToPatchNCE
 class ResnetGenerator_9blocks_2to1(nn.Module):
     def __init__(self, input_nc, output_nc, ngf=64, use_bias=True):
         super(ResnetGenerator_9blocks_2to1, self).__init__()
         self.encoder = MyEncoder(input_nc=input_nc, output_nc=output_nc)
         self.decoder = MyDecoder(input_nc=input_nc, output_nc=output_nc)
-        self.mycat   = MyCatZ(input_nc=512, output_nc=256)
 
     def forward(self, x, layers=[0, 4, 8, 12, 16], encode_only=False):
-        # encoder_only = True
-        x0, x1 = torch.tensor_split(x, 2, dim=1) #x0 := t-1, x1 := t.
-
         if (encode_only):
             feat = x
             feats = []
@@ -29,87 +25,10 @@ class ResnetGenerator_9blocks_2to1(nn.Module):
                     pass
                 if layer_id == layers[-1]:
                     return feats
-        else:
-            z0 = self.encoder(x0)
-            z1 = self.encoder(x1)
-
-            # ResNetもどきで，2つの埋め込み表現を畳み込む．# よい成果がでなかった．
-            # sub_z = torch.cat((z1, z0), dim=1)
-            # z = self.mycat(sub_z)
-            # *****
-            # 単純に，2つの埋め込み表現を足す．
-            z = z1 + z0
-            # *****
-
-            y = self.decoder(z)
-            return y
-
-
-
-class MyCUTGeneratorAdaptedToPatchNCE(nn.Module):
-    def __init__(self, input_nc, output_nc, ngf=64, use_bias=True):
-        super(MyCUTGeneratorAdaptedToPatchNCE, self).__init__()
-
-        self.encoder = MyCUTEncoder(input_nc=input_nc, output_nc=output_nc)
-        self.decoder = MyCUTDecoder(input_nc=input_nc, output_nc=output_nc)
-
-    def forward(self, x, layers=[0, 4, 8, 12, 16], encode_only=False):
-        # encoder_only = True
-        if (encode_only):
-            feat = x
-            feats = []
-            for layer_id, layer in enumerate(self.encoder.model):
-                a = 0
-                feat = layer(feat)
-                if layer_id in layers:
-                    feats.append(feat)
-                else:
-                    pass
-                if layer_id == layers[-1]:
-                    return feats
-        else:
+        else: 
             z = self.encoder(x)
             y = self.decoder(z)
-            return y
 
-class MyCatZ(nn.Module):
-    def __init__(self, input_nc, output_nc, use_bias=True):
-        super(MyCatZ, self).__init__()
-
-        model = [
-            nn.ReflectionPad2d(1),
-            nn.Conv2d(input_nc, output_nc, kernel_size=3, padding=0, bias=use_bias),
-            nn.InstanceNorm2d(output_nc),
-            nn.ReLU(True),
-
-            nn.Dropout(0.5),
-
-            nn.ReflectionPad2d(1),
-            nn.Conv2d(output_nc, output_nc, kernel_size=3, padding=0, bias=use_bias),
-            nn.InstanceNorm2d(output_nc)
-        ]
-
-        self.model = nn.Sequential(*model)
-
-    def forward(self, x):
-        y = self.model(x)
-        return y
-
-class MyGenerator(nn.Module):
-    def __init__(self, input_nc, output_nc, ngf=64, use_bias=True):
-        super(MyGenerator, self).__init__()
-        # model = [
-        #     MyCUTEncoder(input_nc=input_nc, output_nc=output_nc)
-        # ]
-        # self.model = nn.Sequential(*model)
-
-        self.encoder = MyCUTEncoder(input_nc=input_nc, output_nc=output_nc)
-        self.decoder = MyCUTDecoder(input_nc=input_nc, output_nc=output_nc)
-
-    def forward(self, x):
-        # return self.model(x)
-        z = self.encoder(x)
-        y = self.decoder(z)
         return y
 
 
@@ -291,9 +210,8 @@ class Upsample(nn.Module):
 
 
 if __name__ == '__main__':
-    # model = MyCUTGenerator(input_nc=3, output_nc=3)
-    # model = MyCUTGeneratorAdaptedToPatchNCE(input_nc=3, output_nc=3)
     model = ResnetGenerator_9blocks_2to1(input_nc=3, output_nc=3)
+    summary(model, (3, 255, 255), batch_size=1, device="cpu") # summaryはバッチサイズ2を必ず入力してくる.
     
-    # summary(model, (3, 255, 255), device="cpu")
-    summary(model, (6, 255, 255), batch_size=1, device="cpu") # summaryはバッチサイズ2を必ず入力してくる.
+    # model = ResnetGenerator_9blocks_2to1(input_nc=6, output_nc=3) 
+    # summary(model, (6, 255, 255), batch_size=1, device="cpu") # summaryはバッチサイズ2を必ず入力してくる.
